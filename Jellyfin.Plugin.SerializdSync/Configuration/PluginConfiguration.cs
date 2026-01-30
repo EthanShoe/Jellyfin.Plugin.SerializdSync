@@ -1,25 +1,15 @@
+#pragma warning disable CA1819
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Jellyfin.Plugin.SerializdSync.Models;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.SerializdSync.Configuration;
 
 /// <summary>
-/// The configuration options.
-/// </summary>
-public enum SomeOptions
-{
-    /// <summary>
-    /// Option one.
-    /// </summary>
-    OneOption,
-
-    /// <summary>
-    /// Second option.
-    /// </summary>
-    AnotherOption
-}
-
-/// <summary>
-/// Plugin configuration.
+/// Plugin configuration for SerializdSync.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
@@ -28,30 +18,46 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public PluginConfiguration()
     {
-        // set default options here
-        Options = SomeOptions.AnotherOption;
-        TrueFalseSetting = true;
-        AnInteger = 2;
-        AString = "string";
+        SerializdUsers = Array.Empty<SerializdUser>();
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether some true or false setting is enabled..
+    /// Gets or sets the Serializd users.
     /// </summary>
-    public bool TrueFalseSetting { get; set; }
+    public SerializdUser[] SerializdUsers { get; set; }
 
     /// <summary>
-    /// Gets or sets an integer setting.
+    /// Adds a user to the Serializd users.
     /// </summary>
-    public int AnInteger { get; set; }
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    public void AddUser(Guid userGuid)
+    {
+        var users = SerializdUsers.ToList();
+        var user = new SerializdUser
+        {
+            LinkedMbUserId = userGuid
+        };
+        users.Add(user);
+        SerializdUsers = users.ToArray();
+    }
 
     /// <summary>
-    /// Gets or sets a string setting.
+    /// Removes a user from the Serializd users.
     /// </summary>
-    public string AString { get; set; }
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    public void RemoveUser(Guid userGuid)
+    {
+        var users = SerializdUsers.ToList();
+        users.RemoveAll(user => user.LinkedMbUserId == userGuid);
+        SerializdUsers = users.ToArray();
+    }
 
     /// <summary>
-    /// Gets or sets an enum option.
+    /// Gets a list of all Serializd users.
     /// </summary>
-    public SomeOptions Options { get; set; }
+    /// <returns>A read-only list of all Serializd users.</returns>
+    public IReadOnlyList<SerializdUser> GetAllSerializdUsers()
+    {
+        return SerializdUsers.ToList();
+    }
 }

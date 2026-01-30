@@ -8,30 +8,34 @@
     <div id="serializdSyncConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
+                <h1>Serializd Sync</h1>
                 <form id="serializdSyncConfigForm">
                     <div class="selectContainer">
-                        <label class="selectLabel" for="Options">Several Options</label>
-                        <select is="emby-select" id="Options" name="Options" class="emby-select-withcolor emby-select">
-                            <option id="optOneOption" value="OneOption">One Option</option>
-                            <option id="optAnotherOption" value="AnotherOption">Another Option</option>
+                        <label class="selectLabel" for="selectUser">Configure Serializd for:</label>
+                        <select is="emby-select" id="selectUser" name="selectUser" class="emby-select-withcolor emby-select">
                         </select>
                     </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AnInteger">An Integer</label>
-                        <input id="AnInteger" name="AnInteger" type="number" is="emby-input" min="0" />
-                        <div class="fieldDescription">A Description</div>
+
+                    <div class="verticalSection">
+                        <h2>Serializd Credentials</h2>
+                        <p class="fieldDescription">Enter the Serializd account credentials for this Jellyfin user.</p>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="serializdUsername">Serializd Username</label>
+                            <input id="serializdUsername" name="serializdUsername" type="text" is="emby-input" />
+                            <div class="fieldDescription">The username for the Serializd account.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="serializdPassword">Serializd Password</label>
+                            <input id="serializdPassword" name="serializdPassword" type="password" is="emby-input" />
+                            <div class="fieldDescription">The password for the Serializd account.</div>
+                        </div>
+
+                        <div id="credentialsStatus" class="fieldDescription" style="margin-top: 1em;">
+                        </div>
                     </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label class="emby-checkbox-label">
-                            <input id="TrueFalseSetting" name="TrueFalseCheckBox" type="checkbox" is="emby-checkbox" />
-                            <span>A Checkbox</span>
-                        </label>
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="AString">A String</label>
-                        <input id="AString" name="AString" type="text" is="emby-input" />
-                        <div class="fieldDescription">Another Description</div>
-                    </div>
+
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
@@ -42,37 +46,101 @@
         </div>
         <script type="text/javascript">
             var SerializdSyncConfig = {
-                pluginUniqueId: 'eb5d7894-8eef-4b36-aa6f-5d124e828ce1'
+                pluginUniqueId: '6616e553-2549-4e36-abe2-0678676fd506',
+
+                loadConfiguration: function(userId, page) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(SerializdSyncConfig.pluginUniqueId).then(function (config) {
+                        let currentUserConfig = config.SerializdUsers.filter(function (curr) {
+                            return curr.LinkedMbUserId == userId;
+                        })[0];
+
+                        // User doesn't have a config yet, create default
+                        if (!currentUserConfig) {
+                            currentUserConfig = {
+                                LinkedMbUserId: userId,
+                                SerializdUsername: '',
+                                SerializdPassword: ''
+                            };
+                        }
+
+                        page.querySelector('#serializdUsername').value = currentUserConfig.SerializdUsername || '';
+                        page.querySelector('#serializdPassword').value = currentUserConfig.SerializdPassword || '';
+
+                        // Update status display
+                        var statusEl = page.querySelector('#credentialsStatus');
+                        if (currentUserConfig.SerializdUsername && currentUserConfig.SerializdPassword) {
+                            statusEl.innerHTML = '<span style="color: green;">&#10003; Credentials configured for this user.</span>';
+                        } else {
+                            statusEl.innerHTML = '<span style="color: orange;">&#9888; No credentials configured for this user.</span>';
+                        }
+
+                        Dashboard.hideLoadingMsg();
+                    });
+                },
+
+                populateUsers: function(users) {
+                    var html = '';
+                    for (var i = 0; i < users.length; i++) {
+                        var user = users[i];
+                        html += '<option value="' + user.Id + '">' + user.Name + '</option>';
+                    }
+                    document.querySelector('#selectUser').innerHTML = html;
+                },
+
+                save: function(page) {
+                    Dashboard.showLoadingMsg();
+                    var currentUserId = page.querySelector('#selectUser').value;
+
+                    ApiClient.getPluginConfiguration(SerializdSyncConfig.pluginUniqueId).then(function (config) {
+                        var currentUserConfig = config.SerializdUsers.filter(function (curr) {
+                            return curr.LinkedMbUserId == currentUserId;
+                        })[0];
+
+                        // User doesn't have a config, create one
+                        if (!currentUserConfig) {
+                            currentUserConfig = {
+                                LinkedMbUserId: currentUserId
+                            };
+                            config.SerializdUsers.push(currentUserConfig);
+                        }
+
+                        currentUserConfig.SerializdUsername = page.querySelector('#serializdUsername').value;
+                        currentUserConfig.SerializdPassword = page.querySelector('#serializdPassword').value;
+
+                        ApiClient.updatePluginConfiguration(SerializdSyncConfig.pluginUniqueId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                            SerializdSyncConfig.loadConfiguration(currentUserId, page);
+                        });
+                    });
+                }
             };
 
             document.querySelector('#serializdSyncConfigPage')
                 .addEventListener('pageshow', function() {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(SerializdSyncConfig.pluginUniqueId).then(function (config) {
-                        document.querySelector('#Options').value = config.Options;
-                        document.querySelector('#AnInteger').value = config.AnInteger;
-                        document.querySelector('#TrueFalseSetting').checked = config.TrueFalseSetting;
-                        document.querySelector('#AString').value = config.AString;
-                        Dashboard.hideLoadingMsg();
+                    var page = this;
+                    ApiClient.getUsers().then(function (users) {
+                        SerializdSyncConfig.populateUsers(users);
+                        var currentUserId = page.querySelector('#selectUser').value;
+                        if (currentUserId) {
+                            SerializdSyncConfig.loadConfiguration(currentUserId, page);
+                        }
                     });
+                });
+
+            document.querySelector('#selectUser')
+                .addEventListener('change', function() {
+                    var page = document.querySelector('#serializdSyncConfigPage');
+                    SerializdSyncConfig.loadConfiguration(this.value, page);
                 });
 
             document.querySelector('#serializdSyncConfigForm')
                 .addEventListener('submit', function(e) {
-                Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(SerializdSyncConfig.pluginUniqueId).then(function (config) {
-                    config.Options = document.querySelector('#Options').value;
-                    config.AnInteger = document.querySelector('#AnInteger').value;
-                    config.TrueFalseSetting = document.querySelector('#TrueFalseSetting').checked;
-                    config.AString = document.querySelector('#AString').value;
-                    ApiClient.updatePluginConfiguration(SerializdSyncConfig.pluginUniqueId, config).then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
-                    });
+                    var page = document.querySelector('#serializdSyncConfigPage');
+                    SerializdSyncConfig.save(page);
+                    e.preventDefault();
+                    return false;
                 });
-
-                e.preventDefault();
-                return false;
-            });
         </script>
     </div>
 </body>
