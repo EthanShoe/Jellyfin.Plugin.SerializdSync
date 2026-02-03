@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.SerializdSync.Api;
+using Jellyfin.Plugin.SerializdSync.Api.Models;
 using Jellyfin.Plugin.SerializdSync.Helpers;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
@@ -17,12 +19,15 @@ namespace Jellyfin.Plugin.SerializdSync.Services;
 /// Initializes a new instance of the <see cref="PlaybackMonitor"/> class.
 /// </remarks>
 /// <param name="sessionManager">The session manager.</param>
+/// <param name="serializdApi">The Serializd API client.</param>
 /// <param name="logger">The logger.</param>
 public class PlaybackMonitor(
     ISessionManager sessionManager,
+    ISerializdApiClient serializdApi,
     ILogger<PlaybackMonitor> logger) : IHostedService, IDisposable
 {
     private readonly ISessionManager _sessionManager = sessionManager;
+    private readonly ISerializdApiClient _serializdApi = serializdApi;
     private readonly ILogger<PlaybackMonitor> _logger = logger;
     private bool _disposed;
 
@@ -54,19 +59,25 @@ public class PlaybackMonitor(
         }
     }
 
-    private Task HandlePlaybackStoppedAsync(PlaybackStopEventArgs e)
+    private async Task HandlePlaybackStoppedAsync(PlaybackStopEventArgs e)
     {
+        // Only process if played to completion
+        if (!e.PlayedToCompletion)
+        {
+            return;
+        }
+
         // Only process TV episodes
         if (e.Item is not Episode episode)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         // Ensure we have user information
         if (e.Users == null || e.Users.Count == 0)
         {
             _logger.LogDebug("No users associated with playback event");
-            return Task.CompletedTask;
+            return;
         }
 
         foreach (var user in e.Users)
@@ -86,22 +97,27 @@ public class PlaybackMonitor(
             var episodeNumber = episode.IndexNumber ?? 0;
             var episodeName = episode.Name ?? "Unknown Episode";
 
-            if (e.PlayedToCompletion)
-            {
-                _logger.LogInformation(
-                    "User {Username} completed watching: {SeriesName} S{Season:D2}E{Episode:D2} - {EpisodeName}",
-                    user.Username,
-                    seriesName,
-                    seasonNumber,
-                    episodeNumber,
-                    episodeName);
+            _logger.LogInformation(
+                "User {Username} completed watching: {SeriesName} S{Season:D2}E{Episode:D2} - {EpisodeName}",
+                user.Username,
+                seriesName,
+                seasonNumber,
+                episodeNumber,
+                episodeName);
 
-                // TODO: Send completion to Serializd API
-                // await _serializdApi.MarkEpisodeWatchedAsync(serializdUser, episode);
+            try
+            {
+                await _serializdApi.MarkEpisodeWatchedAsync(serializdUser, episode).ConfigureAwait(false);
+            }
+            catch (SerializdApiException ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to mark episode as watched on Serializd for user {Username}: {Message}",
+                    user.Username,
+                    ex.Message);
             }
         }
-
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
