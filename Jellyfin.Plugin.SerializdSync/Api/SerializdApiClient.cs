@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.SerializdSync.Api;
 public class SerializdApiClient : ISerializdApiClient, IDisposable
 {
     private const string BaseUrl = "https://serializd.onrender.com/api/";
+    private const string MobileBaseUrl = "https://serializd.onrender.com/mobile/";
     private const int MaxRetries = 3;
     private const int BaseDelayMs = 1000;
 
@@ -87,8 +88,15 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
             return;
         }
 
+        // Check if episode is already logged on Serializd to determine rewatch status
+        var seasonPage = await GetSeasonPageAsync(user, showInfo.Id, seasonNumber.Value, season.Id, cancellationToken).ConfigureAwait(false);
+        var isRewatch = seasonPage?.EpisodeLogs.Any(l => l.EpisodeNumber == episodeNumber.Value) ?? false;
+
         // Add a log/"review"
-        var episodeReviewRequest = new EpisodeReviewRequest(showInfo.Id, season.Id, episodeNumber.Value);
+        var episodeReviewRequest = new EpisodeReviewRequest(showInfo.Id, season.Id, episodeNumber.Value)
+        {
+            IsRewatch = isRewatch
+        };
 
         await ExecuteWithRetryAsync(
             user,
@@ -110,7 +118,8 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
         {
             ShowId = showInfo.Id,
             SeasonId = season.Id,
-            EpisodeNumbers = [episodeNumber.Value]
+            EpisodeNumbers = [episodeNumber.Value],
+            IsRewatch = isRewatch
         };
 
         await ExecuteWithRetryAsync(
@@ -133,6 +142,31 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
             episode.SeriesName,
             seasonNumber.Value,
             episodeNumber.Value);
+    }
+
+    /// <inheritdoc />
+    public async Task<SeasonPageResponse?> GetSeasonPageAsync(SerializdUser user, int showId, int seasonNumber, int seasonId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        return await ExecuteWithRetryAsync(
+            user,
+            async (client, ct) =>
+            {
+                var url = $"{MobileBaseUrl}page/show/{showId}/season_v2_part_3/{seasonNumber}?season_id={seasonId}";
+                var response = await client.GetAsync(url, ct).ConfigureAwait(false);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                JsonSerializerOptions jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                return await response.Content.ReadFromJsonAsync<SeasonPageResponse>(jsonOptions, ct).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

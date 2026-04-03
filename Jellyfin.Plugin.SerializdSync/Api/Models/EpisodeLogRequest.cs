@@ -23,4 +23,9 @@ public class EpisodeLogRequest
     /// Gets or sets the episode numbers to mark as watched.
     /// </summary>
     public required int[] EpisodeNumbers { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this is a rewatch.
+    /// </summary>
+    public bool IsRewatch { get; set; }
 }

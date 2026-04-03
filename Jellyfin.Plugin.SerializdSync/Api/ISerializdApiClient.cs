@@ -30,6 +30,17 @@ public interface ISerializdApiClient
     Task<ShowInfoResponse?> GetShowInfoAsync(SerializdUser user, string tmdbShowId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the season page data for a show, including the user's episode logs.
+    /// </summary>
+    /// <param name="user">The Serializd user configuration.</param>
+    /// <param name="showId">The Serializd show ID.</param>
+    /// <param name="seasonNumber">The season number.</param>
+    /// <param name="seasonId">The Serializd season ID.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The season page data, or null if not found.</returns>
+    Task<SeasonPageResponse?> GetSeasonPageAsync(SerializdUser user, int showId, int seasonNumber, int seasonId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Validates user credentials with Serializd.
     /// </summary>
     /// <param name="user">The Serializd user configuration.</param>
