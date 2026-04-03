@@ -20,7 +20,7 @@ namespace Jellyfin.Plugin.SerializdSync.Api;
 /// </summary>
 public class SerializdApiClient : ISerializdApiClient, IDisposable
 {
-    private const string BaseUrl = "https://www.serializd.com/api/";
+    private const string BaseUrl = "https://serializd.onrender.com/api/";
     private const int MaxRetries = 3;
     private const int BaseDelayMs = 1000;
 
@@ -255,7 +255,6 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
         };
 
         client.DefaultRequestHeaders.Add("X-Requested-With", "serializd_vercel");
-        client.DefaultRequestHeaders.Add("Origin", "https://www.serializd.com");
 
         var authState = new UserAuthState
         {
@@ -304,7 +303,7 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
 
         // Set the token as a cookie for authentication
         authState.CookieContainer.Add(
-            new Uri("https://www.serializd.com"),
+            new Uri("https://serializd.onrender.com"),
             new Cookie("tvproject_credentials", loginResponse.Token));
 
         authState.IsAuthenticated = true;
