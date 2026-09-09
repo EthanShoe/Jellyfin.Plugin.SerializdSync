@@ -18,7 +18,7 @@ namespace Jellyfin.Plugin.SerializdSync.Api;
 /// <summary>
 /// Client for interacting with the Serializd API.
 /// </summary>
-public class SerializdApiClient : ISerializdApiClient, IDisposable
+public partial class SerializdApiClient : ISerializdApiClient, IDisposable
 {
     private const string BaseUrl = "https://serializd.onrender.com/api/";
     private const string MobileBaseUrl = "https://serializd.onrender.com/mobile/";
@@ -137,11 +137,7 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
             },
             cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation(
-            "Successfully marked as watched on Serializd: {SeriesName} S{Season:D2}E{Episode:D2}",
-            episode.SeriesName,
-            seasonNumber.Value,
-            episodeNumber.Value);
+        LogEpisodeMarkedWatched(episode.SeriesName, seasonNumber.Value, episodeNumber.Value);
     }
 
     /// <inheritdoc />
@@ -237,7 +233,7 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
                 }
                 catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    _logger.LogDebug("Authentication expired, re-authenticating (attempt {Attempt})", attempt + 1);
+                    LogReauthenticating(attempt + 1);
 
                     // Clear auth and retry
                     authState.IsAuthenticated = false;
@@ -255,7 +251,7 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
                     }
 
                     var delay = TimeSpan.FromMilliseconds(BaseDelayMs * Math.Pow(2, attempt));
-                    _logger.LogDebug("Transient error, retrying in {Delay}ms (attempt {Attempt})", delay.TotalMilliseconds, attempt + 1);
+                    LogTransientErrorRetry(delay.TotalMilliseconds, attempt + 1);
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
@@ -314,7 +310,7 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
             return;
         }
 
-        _logger.LogDebug("Authenticating with Serializd as {Username}", user.SerializdUsername);
+        LogAuthenticating(user.SerializdUsername);
 
         var loginRequest = new LoginRequest
         {
@@ -385,6 +381,18 @@ public class SerializdApiClient : ISerializdApiClient, IDisposable
 
         _disposed = true;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Successfully marked as watched on Serializd: {SeriesName} S{Season:D2}E{Episode:D2}")]
+    private partial void LogEpisodeMarkedWatched(string? seriesName, int season, int episode);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Authentication expired, re-authenticating (attempt {Attempt})")]
+    private partial void LogReauthenticating(int attempt);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Transient error, retrying in {Delay}ms (attempt {Attempt})")]
+    private partial void LogTransientErrorRetry(double delay, int attempt);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Authenticating with Serializd as {Username}")]
+    private partial void LogAuthenticating(string username);
 
     private sealed class UserAuthState
     {

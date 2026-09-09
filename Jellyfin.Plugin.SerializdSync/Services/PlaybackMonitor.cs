@@ -21,7 +21,7 @@ namespace Jellyfin.Plugin.SerializdSync.Services;
 /// <param name="sessionManager">The session manager.</param>
 /// <param name="serializdApi">The Serializd API client.</param>
 /// <param name="logger">The logger.</param>
-public class PlaybackMonitor(
+public partial class PlaybackMonitor(
     ISessionManager sessionManager,
     ISerializdApiClient serializdApi,
     ILogger<PlaybackMonitor> logger) : IHostedService, IDisposable
@@ -86,9 +86,7 @@ public class PlaybackMonitor(
             var serializdUser = SerializdUserHelper.GetSerializdUser(user.Id, requireCredentials: true);
             if (serializdUser == null)
             {
-                _logger.LogDebug(
-                    "User {Username} does not have Serializd credentials configured, skipping",
-                    user.Username);
+                LogNoCredentials(user.Username);
                 continue;
             }
 
@@ -97,13 +95,7 @@ public class PlaybackMonitor(
             var episodeNumber = episode.IndexNumber ?? 0;
             var episodeName = episode.Name ?? "Unknown Episode";
 
-            _logger.LogInformation(
-                "User {Username} completed watching: {SeriesName} S{Season:D2}E{Episode:D2} - {EpisodeName}",
-                user.Username,
-                seriesName,
-                seasonNumber,
-                episodeNumber,
-                episodeName);
+            LogEpisodeWatched(user.Username, seriesName, seasonNumber, episodeNumber, episodeName);
 
             try
             {
@@ -145,4 +137,10 @@ public class PlaybackMonitor(
 
         _disposed = true;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "User {Username} does not have Serializd credentials configured, skipping")]
+    private partial void LogNoCredentials(string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} completed watching: {SeriesName} S{Season:D2}E{Episode:D2} - {EpisodeName}")]
+    private partial void LogEpisodeWatched(string username, string seriesName, int season, int episode, string episodeName);
 }
